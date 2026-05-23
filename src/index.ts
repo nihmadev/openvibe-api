@@ -13,7 +13,8 @@ function getBaseUrl(raw: string): string {
 function parseModelName(modelId: string): string {
   let name = modelId;
   if (name.includes("/")) name = name.slice(name.indexOf("/") + 1);
-  if (name.length > 0) name = name[0]!.toUpperCase() + name.slice(1);
+  name = name.replace(/[-_]/g, " ");
+  name = name.split(" ").map((w) => w.length > 0 ? w[0]!.toUpperCase() + w.slice(1) : w).join(" ");
   return name;
 }
 

@@ -17,6 +17,7 @@ function parseModelName(modelId: string): string {
   name = name.replace(/[-_]/g, " ");
   name = name.split(" ").map((w) => w.length > 0 ? w[0]!.toUpperCase() + w.slice(1) : w).join(" ");
   name = name.replace(/\bGpt\b/g, "GPT").replace(/\bGlm\b/g, "GLM");
+  name = name.replace(/\bOss\b/g, "OSS").replace(/\bLfm\b/g, "LFM");
   return name;
 }
 

@@ -10,6 +10,13 @@ function getBaseUrl(raw: string): string {
   return raw.replace(/\/+$/, "");
 }
 
+function parseModelName(modelId: string): string {
+  let name = modelId;
+  if (name.includes("/")) name = name.slice(name.indexOf("/") + 1);
+  if (name.length > 0) name = name[0]!.toUpperCase() + name.slice(1);
+  return name;
+}
+
 // ---------------------------------------------------------------------------
 // POST /v2/:provider/chat/completions
 // ---------------------------------------------------------------------------
@@ -105,7 +112,7 @@ app.get("/v2/:provider/models", async (req, res) => {
 
     const data = await providerRes.json();
     if (data?.data && Array.isArray(data.data)) {
-      const models = (data.data as Array<{ id: string }>).map((m) => ({ id: m.id }));
+      const models = (data.data as Array<{ id: string }>).map((m) => ({ id: m.id, name: parseModelName(m.id) }));
       res.json({ ok: true, models });
     } else {
       res.json({ ok: false, error: "Unexpected response format" });

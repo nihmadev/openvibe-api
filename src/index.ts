@@ -13,6 +13,7 @@ function getBaseUrl(raw: string): string {
 function parseModelName(modelId: string): string {
   let name = modelId;
   if (name.includes("/")) name = name.slice(name.indexOf("/") + 1);
+  name = name.replace(/:free$/i, " (Free)");
   name = name.replace(/[-_]/g, " ");
   name = name.split(" ").map((w) => w.length > 0 ? w[0]!.toUpperCase() + w.slice(1) : w).join(" ");
   return name;

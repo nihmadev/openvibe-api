@@ -36,12 +36,18 @@ app.post("/v2/:provider/chat/completions", async (req, res) => {
   try {
     const base = getBaseUrl(providerBaseUrl);
     const isGoogleAI = base.includes("generativelanguage.googleapis.com");
+    const isGitHubModels = base.includes("models.github.ai");
+    const chatPath = isGitHubModels ? "/inference/chat/completions" : "/chat/completions";
     const url = isGoogleAI
       ? `${base}/chat/completions?key=${apiKey}`
-      : `${base}/chat/completions`;
+      : `${base}${chatPath}`;
     const authHeaders: Record<string, string> = isGoogleAI
       ? { "Content-Type": "application/json" }
       : { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` };
+    if (isGitHubModels) {
+      authHeaders["Accept"] = "application/vnd.github+json";
+      authHeaders["X-GitHub-Api-Version"] = "2026-03-10";
+    }
 
     const providerRes = await fetch(url, {
       method: "POST",
@@ -100,9 +106,25 @@ app.get("/v2/:provider/models", async (req, res) => {
   try {
     const base = getBaseUrl(providerBaseUrl);
     const isGoogleAI = base.includes("generativelanguage.googleapis.com");
-    const url = isGoogleAI && apiKey ? `${base}/models?key=${apiKey}` : `${base}/models`;
+    const isGitHubModels = base.includes("models.github.ai");
+
+    let url: string;
     const authHeaders: Record<string, string> = {};
-    if (apiKey && !isGoogleAI) authHeaders["Authorization"] = `Bearer ${apiKey}`;
+    let useDefaultMapping = true;
+
+    if (isGitHubModels) {
+      url = `${base}/catalog/models`;
+      if (apiKey) authHeaders["Authorization"] = `Bearer ${apiKey}`;
+      authHeaders["Accept"] = "application/vnd.github+json";
+      authHeaders["X-GitHub-Api-Version"] = "2026-03-10";
+      useDefaultMapping = false;
+    } else if (isGoogleAI && apiKey) {
+      url = `${base}/models?key=${apiKey}`;
+      if (apiKey) authHeaders["Authorization"] = `Bearer ${apiKey}`;
+    } else {
+      url = `${base}/models`;
+      if (apiKey) authHeaders["Authorization"] = `Bearer ${apiKey}`;
+    }
 
     const providerRes = await fetch(url, {
       headers: authHeaders,
@@ -114,13 +136,38 @@ app.get("/v2/:provider/models", async (req, res) => {
       return;
     }
 
-    const data = await providerRes.json();
-    if (data?.data && Array.isArray(data.data)) {
-      const models = (data.data as Array<{ id: string }>).map((m) => ({ id: m.id, name: parseModelName(m.id) }));
-      res.json({ ok: true, models });
+    let models: Array<{ id: string }>;
+
+    if (isGitHubModels) {
+      const data = await providerRes.json();
+      if (Array.isArray(data)) {
+        models = data.map((m: { id?: string; name?: string }) => ({
+          id: m.id ?? "",
+          name: m.name ?? parseModelName(m.id ?? ""),
+        })).filter((m: { id: string }) => m.id);
+      } else {
+        res.json({ ok: false, error: "Unexpected response format" });
+        return;
+      }
+    } else if (useDefaultMapping) {
+      const data = await providerRes.json();
+      if (data?.data && Array.isArray(data.data)) {
+        models = (data.data as Array<{ id: string }>).map((m) => ({ id: m.id, name: parseModelName(m.id) }));
+      } else {
+        res.json({ ok: false, error: "Unexpected response format" });
+        return;
+      }
     } else {
-      res.json({ ok: false, error: "Unexpected response format" });
+      const data = await providerRes.json();
+      if (data?.data && Array.isArray(data.data)) {
+        models = (data.data as Array<{ id: string }>).map((m) => ({ id: m.id, name: parseModelName(m.id) }));
+      } else {
+        res.json({ ok: false, error: "Unexpected response format" });
+        return;
+      }
     }
+
+    res.json({ ok: true, models });
   } catch (error) {
     res.status(502).json({ ok: false, error: (error as Error).message });
   }
